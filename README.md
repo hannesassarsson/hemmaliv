@@ -38,4 +38,4 @@ Originalprojektet använder öppna RLS-regler och en lokal personväljare, inte 
 
 ## Push-notiser
 
-Gränssnittet kan registrera web push när `VITE_VAPID_PUBLIC_KEY` finns, men serverutskick och schemaläggning är avsiktligt inte aktiverade i MVP:n. De bör sättas upp med en Vercel-funktion, Vercel Cron och serverhemligheter (`SUPABASE_SERVICE_ROLE_KEY`, `VAPID_PRIVATE_KEY` och en crontoken) efter att autentisering/RLS har förstärkts.
+En Vercel Cron-funktion kontrollerar förfallna deadlines var femte minut och skickar web push till registrerade enheter. För att aktivera den, lägg in `VITE_VAPID_PUBLIC_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `SUPABASE_SERVICE_ROLE_KEY` och `CRON_SECRET` i Vercel. Alla utom den första är serverhemligheter och får aldrig börja med `VITE_`.
