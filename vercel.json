@@ -3,6 +3,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "crons": [
-    { "path": "/api/notifications", "schedule": "*/5 * * * *" }
+    { "path": "/api/notifications", "schedule": "0 7 * * *" }
   ]
 }
