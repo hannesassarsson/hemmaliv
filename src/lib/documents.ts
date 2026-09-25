@@ -24,6 +24,7 @@ export type DocumentRow = {
   issuer: string | null;
   summary: string | null;
   ai_status: "pending" | "done" | "failed";
+  ai_error: string | null;
   created_at: string;
 };
 
@@ -70,7 +71,7 @@ export async function uploadDocument(file: File, uploadedBy: Person): Promise<vo
   void fetch("/api/parse-document", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: data.id, storagePath, mimeType: file.type }),
+    body: JSON.stringify({ id: data.id, storagePath, mimeType: file.type, fileType }),
   }).catch(() => {
     /* surfaced via ai_status staying "pending"/"failed" on refetch */
   });
