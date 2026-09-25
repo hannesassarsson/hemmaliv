@@ -1,52 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import ICAL from "ical.js";
 import { CalendarX2, Dumbbell, RefreshCw } from "lucide-react";
 
-const ICS_URL =
-  "https://raw.githubusercontent.com/hannesassarsson/-training-calendar/main/training.ics";
-
-type TrainingEvent = {
-  uid: string;
-  title: string;
-  description: string;
-  start: Date;
-  end: Date;
-};
-
-async function fetchTraining(): Promise<TrainingEvent[]> {
-  const res = await fetch(ICS_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error("Kunde inte hämta träningsschemat");
-  const text = await res.text();
-  const jcal = ICAL.parse(text);
-  const comp = new ICAL.Component(jcal);
-  const events = comp.getAllSubcomponents("vevent").map((ve) => {
-    const event = new ICAL.Event(ve);
-    return {
-      uid: event.uid,
-      title: event.summary || "Träning",
-      description: event.description || "",
-      start: event.startDate.toJSDate(),
-      end: event.endDate.toJSDate(),
-    };
-  });
-  return events.sort((a, b) => a.start.getTime() - b.start.getTime());
-}
-
-function dayLabel(date: Date) {
-  const today = new Date();
-  const isSameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  if (isSameDay(date, today)) return "Idag";
-  if (isSameDay(date, tomorrow)) return "Imorgon";
-  return date.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "short" });
-}
-
-function timeLabel(start: Date, end: Date) {
-  const fmt = (d: Date) => d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
-  return `${fmt(start)}–${fmt(end)}`;
-}
+import { dayLabel, fetchTraining, timeLabel } from "@/lib/calendars";
 
 export function Training() {
   const { data: events = [], isLoading, isError, refetch, isFetching } = useQuery({
