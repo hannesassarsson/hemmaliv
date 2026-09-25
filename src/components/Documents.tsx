@@ -146,7 +146,10 @@ export function Documents() {
                   </p>
                 )}
                 {doc.ai_status === "failed" && (
-                  <p className="mt-1 text-xs text-muted-foreground">Kunde inte tolkas automatiskt.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Kunde inte tolkas automatiskt.
+                    {doc.ai_error ? ` (${doc.ai_error})` : ""}
+                  </p>
                 )}
               </button>
               <div className="flex shrink-0 flex-col items-end gap-2">
