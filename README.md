@@ -38,4 +38,6 @@ Originalprojektet använder öppna RLS-regler och en lokal personväljare, inte 
 
 ## Push-notiser
 
-En Vercel Cron-funktion kontrollerar förfallna deadlines var femte minut och skickar web push till registrerade enheter. För att aktivera den, lägg in `VITE_VAPID_PUBLIC_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `SUPABASE_SERVICE_ROLE_KEY` och `CRON_SECRET` i Vercel. Alla utom den första är serverhemligheter och får aldrig börja med `VITE_`.
+`/api/notifications` kontrollerar förfallna deadlines var femte minut och skickar web push till registrerade enheter. För att aktivera den, lägg in `VITE_VAPID_PUBLIC_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `SUPABASE_SERVICE_ROLE_KEY` och `CRON_SECRET` i Vercel. Alla utom den första är serverhemligheter och får aldrig börja med `VITE_`.
+
+Vercels gratisplan kör bara cron en gång per dygn, så GitHub Actions-flödet `.github/workflows/notifications.yml` anropar endpointen var femte minut. Lägg in samma `CRON_SECRET` som repo-hemlighet under **Settings → Secrets and variables → Actions**. Om appen byter adress, sätt variabeln `APP_URL` där. Flödet kan köras manuellt under **Actions → Påminnelser → Run workflow** för att testa.

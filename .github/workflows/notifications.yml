@@ -1,0 +1,30 @@
+name: Påminnelser
+
+# Vercels gratisplan tillåter bara cron en gång per dygn, så GitHub Actions
+# anropar notis-endpointen var femte minut i stället.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: notifications
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Skicka förfallna påminnelser
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ vars.APP_URL || 'https://hemmaliv-hannes4.vercel.app' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Lägg till CRON_SECRET under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/notifications"

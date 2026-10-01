@@ -41,15 +41,18 @@ export default async function handler(request, response) {
   }
 
   let sent = 0;
+  // Returnerar antal lyckade leveranser så att posten bara markeras som notifierad när något gick fram.
   const send = async (message) => {
     const payload = JSON.stringify({ ...message, url: "/" });
     const attempts = await Promise.allSettled(
       subscriptions.map((subscription) => webpush.sendNotification(subscription, payload, { TTL: 3600 })),
     );
+    let delivered = 0;
     for (let index = 0; index < attempts.length; index += 1) {
       const attempt = attempts[index];
       if (attempt.status === "fulfilled") {
         sent += 1;
+        delivered += 1;
         continue;
       }
       const statusCode = attempt.reason?.statusCode;
@@ -58,15 +61,16 @@ export default async function handler(request, response) {
       }
       console.error("Push delivery failed", attempt.reason);
     }
+    return delivered;
   };
 
   for (const todo of todos ?? []) {
-    await send({ title: "Dags nu: att göra", body: `${todo.text} (${todo.list_type})`, tag: `todo-${todo.id}` });
-    await supabase.from("todo_items").update({ notified_at: now }).eq("id", todo.id);
+    const delivered = await send({ title: "Dags nu: att göra", body: `${todo.text} (${todo.list_type})`, tag: `todo-${todo.id}` });
+    if (delivered) await supabase.from("todo_items").update({ notified_at: now }).eq("id", todo.id);
   }
   for (const item of shopping ?? []) {
-    await send({ title: "Påminnelse: handla", body: item.text, tag: `shopping-${item.id}` });
-    await supabase.from("shopping_items").update({ notified_at: now }).eq("id", item.id);
+    const delivered = await send({ title: "Påminnelse: handla", body: item.text, tag: `shopping-${item.id}` });
+    if (delivered) await supabase.from("shopping_items").update({ notified_at: now }).eq("id", item.id);
   }
 
   return json(response, 200, { ok: true, sent });
