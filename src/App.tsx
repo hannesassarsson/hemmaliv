@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Dumbbell, FileText, Home, ListChecks, LogOut, Moon, Settings, ShoppingBasket, Sun, UtensilsCrossed, X } from "lucide-react";
 import { Documents } from "@/components/Documents";
-import { LoginScreen, NotMemberScreen } from "@/components/LoginScreen";
+import { LoginScreen, NewPasswordScreen, NotMemberScreen } from "@/components/LoginScreen";
 import { MealPlanner } from "@/components/MealPlanner";
 import { NotificationsCard } from "@/components/NotificationsCard";
 import { Overview } from "@/components/Overview";
@@ -72,6 +72,7 @@ export default function App() {
 
   if (status === "loading") return <div className="min-h-screen bg-background" />;
   if (status === "signedOut") return <LoginScreen />;
+  if (status === "recovery") return <NewPasswordScreen />;
   if (status === "notMember") return <NotMemberScreen />;
 
   return <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col bg-background">
