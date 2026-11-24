@@ -36,14 +36,9 @@ Byggkommandot är `npm run build` och katalogen för resultatet är `dist`.
 
 Om samma Supabase-projekt används läser appen samma tabeller (`shopping_items`, `todo_items`, `meal_plan`, `meal_ideas`) och befintlig data blir kvar. Den här MVP:n ändrar inte databasen och kör inga migrationer.
 
-Inloggning sker med Supabase Auth (e-post och lösenord). Ett konto får bara tillgång till appen när det finns i tabellen `hemma_members`, som kopplar kontot till Hannes eller Elvira. Lägg till ett konto efter att personen har skapat det i appen:
+Inloggning sker med Supabase Auth (e-post och lösenord). Ett konto får bara tillgång till appen när det finns i tabellen `hemma_members`, som kopplar kontot till Hannes eller Elvira. E-postadresser i `hemma_invites` kopplas automatiskt när kontot skapas och e-posten är bekräftad.
 
-```sql
-insert into public.hemma_members (user_id, person)
-select id, 'Elvira' from auth.users where email = 'elviras@epost.se';
-```
-
-Migrationen `20261124120200_lock_down_rls.sql` stänger databasen och dokumentlagringen för alla som inte är medlemmar. Kör den först när båda kontona finns i `hemma_members`. Serverfunktionerna under `api/` kräver en inloggad medlem (utom `/api/notifications`, som skyddas av `CRON_SECRET`).
+Migrationen `20261124120200_lock_down_rls.sql` stänger databasen och dokumentlagringen för alla som inte är medlemmar. Serverfunktionerna under `api/` kräver en inloggad medlem (utom `/api/notifications`, som skyddas av `CRON_SECRET`).
 
 ## Push-notiser
 
