@@ -97,6 +97,18 @@ export async function addShopping(text: string, addedBy: Person) {
   if (error) throw error;
 }
 
+/** Lägger in flera varor på en gång, t.ex. ingredienser från matsedeln. */
+export async function addShoppingMany(
+  items: { text: string; category: string; sort_order: number }[],
+  addedBy: Person,
+) {
+  if (!items.length) return;
+  const { error } = await supabase
+    .from("shopping_items")
+    .insert(items.map((item) => ({ ...item, text: item.text.trim(), added_by: addedBy })));
+  if (error) throw error;
+}
+
 export async function updateShopping(id: string, patch: Partial<ShoppingItem>) {
   const { error } = await supabase.from("shopping_items").update(patch).eq("id", id);
   if (error) throw error;

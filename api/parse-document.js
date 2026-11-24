@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { requireMember } from "./_auth.js";
+import { geminiJson } from "./_gemini.js";
 
 const json = (response, status, body) => response.status(status).json(body);
 
@@ -29,44 +30,14 @@ Läs dokumentet och svara ENDAST med ett JSON-objekt enligt schemat:
 
 Om det är ett kvitto, sätt category till "kvitto" och amount till totalsumman. Gissa aldrig vilt — sätt null när du är osäker.`;
 
-async function callGemini(base64, mimeType, fileType) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY saknas");
-
-  // Google replaced the old generateContent endpoint with the Interactions
-  // API during 2026. gemini-3.5-flash is the cheapest current model that's
-  // confirmed to still accept image/PDF input (the flash-lite tier is
-  // text-only).
-  const res = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      model: "gemini-3.5-flash",
-      input: [
-        { type: "text", text: PROMPT },
-        { type: fileType === "pdf" ? "document" : "image", data: base64, mime_type: mimeType },
-      ],
-      response_format: {
-        type: "text",
-        mime_type: "application/json",
-        schema: RESPONSE_SCHEMA,
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Gemini svarade ${res.status}: ${body.slice(0, 500)}`);
-  }
-
-  const data = await res.json();
-  if (data.status && data.status !== "completed") {
-    throw new Error(`Gemini-status ${data.status}: ${JSON.stringify(data).slice(0, 500)}`);
-  }
-  const modelStep = [...(data.steps ?? [])].reverse().find((s) => s.type === "model_output");
-  const text = modelStep?.content?.find((c) => c.type === "text")?.text;
-  if (!text) throw new Error(`Inget svar från Gemini: ${JSON.stringify(data).slice(0, 500)}`);
-  return JSON.parse(text);
+function callGemini(base64, mimeType, fileType) {
+  return geminiJson(
+    [
+      { type: "text", text: PROMPT },
+      { type: fileType === "pdf" ? "document" : "image", data: base64, mime_type: mimeType },
+    ],
+    RESPONSE_SCHEMA,
+  );
 }
 
 export default async function handler(request, response) {
@@ -77,15 +48,9 @@ export default async function handler(request, response) {
     return json(response, 400, { error: "id, storagePath och mimeType krävs" });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return json(response, 500, { error: "Saknar Supabase-konfiguration" });
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const member = await requireMember(request, response);
+  if (!member) return;
+  const { supabase } = member;
 
   try {
     const { data: file, error: downloadError } = await supabase.storage

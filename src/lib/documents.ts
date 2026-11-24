@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase";
 import type { Person } from "./hemma";
+import { authFetch } from "./person-context";
 
 export type DocumentCategory = "kvitto" | "forsakring" | "garanti" | "kontrakt" | "ovrigt";
 
@@ -68,7 +69,7 @@ export async function uploadDocument(file: File, uploadedBy: Person): Promise<vo
   // Fire-and-forget: let the serverless function read the file back and
   // extract structured data. The row already exists so the UI can show a
   // "tolkar..." state immediately regardless of how this call goes.
-  void fetch("/api/parse-document", {
+  void authFetch("/api/parse-document", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id: data.id, storagePath, mimeType: file.type, fileType }),

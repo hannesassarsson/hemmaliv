@@ -22,6 +22,24 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
+const REMINDER_OPTIONS = [
+  { minutes: 0, label: "Vid deadline" },
+  { minutes: 15, label: "15 min innan" },
+  { minutes: 60, label: "1 h innan" },
+  { minutes: 24 * 60, label: "Dagen innan" },
+];
+
+/** Hur många minuter före deadline påminnelsen ligger (0 = vid deadline). */
+function reminderOffset(item: TodoItem) {
+  if (!item.deadline || !item.reminder) return 0;
+  return Math.max(0, Math.round((Date.parse(item.deadline) - Date.parse(item.reminder)) / 60_000));
+}
+
+function reminderFor(deadline: string | null, minutes: number) {
+  if (!deadline || minutes === 0) return null;
+  return new Date(Date.parse(deadline) - minutes * 60_000).toISOString();
+}
+
 const TABS: { key: ListType; label: string }[] = [
   { key: "gemensamt", label: "Gemensamt" },
   { key: "hannes", label: "Hannes" },
@@ -174,6 +192,9 @@ export function TodoLists() {
                       <CalendarClock className="size-3.5" />
                       {formatDeadline(item.deadline)}
                       {overdue ? " · förfallet" : ""}
+                      {!overdue && item.reminder
+                        ? ` · påminnelse ${REMINDER_OPTIONS.find((o) => o.minutes === reminderOffset(item))?.label.toLowerCase() ?? formatDeadline(item.reminder)}`
+                        : ""}
                     </p>
                   ) : null}
                 </div>
@@ -267,12 +288,17 @@ export function TodoLists() {
                   <Input
                     type="datetime-local"
                     defaultValue={toLocalInput(item.deadline)}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const deadline = fromLocalInput(e.target.value);
                       update.mutate({
                         id: item.id,
-                        patch: { deadline: fromLocalInput(e.target.value), notified_at: null },
-                      })
-                    }
+                        patch: {
+                          deadline,
+                          reminder: reminderFor(deadline, reminderOffset(item)),
+                          notified_at: null,
+                        },
+                      });
+                    }}
                     className="h-11 flex-1 rounded-xl"
                     aria-label="Deadline"
                   />
@@ -280,10 +306,38 @@ export function TodoLists() {
                     <Button
                       variant="ghost"
                       className="h-11 rounded-xl"
-                      onClick={() => update.mutate({ id: item.id, patch: { deadline: null } })}
+                      onClick={() =>
+                        update.mutate({ id: item.id, patch: { deadline: null, reminder: null } })
+                      }
                     >
                       Ta bort
                     </Button>
+                  ) : null}
+                  {item.deadline ? (
+                    <div className="flex w-full flex-wrap gap-1.5" role="group" aria-label="Påminnelse">
+                      {REMINDER_OPTIONS.map((option) => (
+                        <button
+                          key={option.minutes}
+                          type="button"
+                          onClick={() =>
+                            update.mutate({
+                              id: item.id,
+                              patch: {
+                                reminder: reminderFor(item.deadline, option.minutes),
+                                notified_at: null,
+                              },
+                            })
+                          }
+                          className={`rounded-full px-3 py-1.5 text-xs ${
+                            reminderOffset(item) === option.minutes
+                              ? "bg-primary text-primary-foreground"
+                              : "border border-border text-muted-foreground"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
               ) : null}

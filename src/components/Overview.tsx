@@ -7,14 +7,26 @@ import {
   CloudSnow,
   Cloud,
   Droplets,
+  ChevronRight,
   ListChecks,
   Loader2,
   ShoppingBasket,
   Sun,
+  UtensilsCrossed,
   Wind,
 } from "lucide-react";
 
-import { fetchShopping, fetchTodos } from "@/lib/hemma";
+import { NotificationsCard } from "@/components/NotificationsCard";
+import {
+  DAYS,
+  fetchMealPlan,
+  fetchShopping,
+  fetchTodos,
+  formatDeadline,
+  isoDate,
+  mondayOf,
+  sortTodos,
+} from "@/lib/hemma";
 import { dayLabel, fetchFamilyEvents, fetchTraining, timeLabel, type CalendarEvent } from "@/lib/calendars";
 import { fetchWeather, HOME_LOCATION, weatherText } from "@/lib/weather";
 import { usePerson } from "@/lib/person-context";
@@ -35,8 +47,11 @@ function greeting(person: string | null) {
   return person ? `${time}, ${person}` : time;
 }
 
-export function Overview() {
+type Destination = "handla" | "attgora" | "mat";
+
+export function Overview({ onNavigate }: { onNavigate: (tab: Destination) => void }) {
   const { person } = usePerson();
+  const mealPlan = useQuery({ queryKey: ["mealPlan"], queryFn: fetchMealPlan });
 
   const weather = useQuery({ queryKey: ["weather"], queryFn: fetchWeather, staleTime: 10 * 60_000 });
   const training = useQuery({ queryKey: ["training"], queryFn: fetchTraining, staleTime: 5 * 60_000 });
@@ -58,6 +73,26 @@ export function Overview() {
     .slice(0, 6);
 
   const todoLeft = (todos.data ?? []).filter((t) => !t.done).length;
+
+  const today = new Date();
+  const todayKey = DAYS[(today.getDay() + 6) % 7];
+  const tonight = (mealPlan.data ?? []).find(
+    (m) => m.week_start === isoDate(mondayOf(today)) && m.day === todayKey,
+  )?.dish_text;
+
+  // Mina och gemensamma uppgifter som är försenade eller ska vara klara idag.
+  const myList = person === "Elvira" ? "elvira" : "hannes";
+  const endOfToday = new Date(today);
+  endOfToday.setHours(23, 59, 59, 999);
+  const urgent = sortTodos(
+    (todos.data ?? []).filter(
+      (t) =>
+        !t.done &&
+        t.deadline &&
+        Date.parse(t.deadline) <= endOfToday.getTime() &&
+        (t.list_type === "gemensamt" || t.list_type === myList),
+    ),
+  ).slice(0, 4);
   const shoppingLeft = (shopping.data ?? []).filter((s) => !s.done).length;
 
   let lastDay = "";
@@ -137,21 +172,59 @@ export function Overview() {
         )}
       </div>
 
+      <NotificationsCard promptOnly />
+
+      <button
+        type="button"
+        onClick={() => onNavigate("mat")}
+        className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-soft"
+      >
+        <UtensilsCrossed className="size-5 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-muted-foreground">Middag ikväll</p>
+          <p className="truncate text-foreground">{tonight || "Inget planerat – välj något"}</p>
+        </div>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+
+      {urgent.length > 0 && (
+        <button
+          type="button"
+          onClick={() => onNavigate("attgora")}
+          className="w-full rounded-2xl border border-border bg-card p-3 text-left shadow-soft"
+        >
+          <p className="mb-2 text-xs text-muted-foreground">Att göra idag</p>
+          <ul className="space-y-1.5">
+            {urgent.map((t) => {
+              const late = Date.parse(t.deadline!) < Date.now();
+              return (
+                <li key={t.id} className="flex items-baseline justify-between gap-2 text-sm">
+                  <span className="truncate text-foreground">{t.text}</span>
+                  <span className={`shrink-0 text-xs ${late ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+                    {late ? "försenad" : formatDeadline(t.deadline!).split(" ").pop()}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </button>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
-        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-soft">
+        <button type="button" onClick={() => onNavigate("handla")} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-soft">
           <ShoppingBasket className="size-5 text-primary" />
           <div>
             <p className="text-lg leading-none text-foreground">{shoppingLeft}</p>
             <p className="text-xs text-muted-foreground">kvar att handla</p>
           </div>
-        </div>
-        <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-soft">
+        </button>
+        <button type="button" onClick={() => onNavigate("attgora")} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-soft">
           <ListChecks className="size-5 text-primary" />
           <div>
             <p className="text-lg leading-none text-foreground">{todoLeft}</p>
             <p className="text-xs text-muted-foreground">kvar att göra</p>
           </div>
-        </div>
+        </button>
       </div>
 
       <div>

@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, CornerDownLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, CornerDownLeft, Loader2, ShoppingBasket, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
   DAYS,
   addDays,
+  addShoppingMany,
+  fetchShopping,
   fetchMealIdeas,
   fetchMealPlan,
   formatWeekLabel,
@@ -15,7 +17,8 @@ import {
   saveMealIdea,
 } from "@/lib/hemma";
 import { notifyOthers } from "@/lib/notify";
-import { usePerson } from "@/lib/person-context";
+import { authFetch, usePerson } from "@/lib/person-context";
+import { CATEGORY_LABEL, categoryIndex, normalizeCategory } from "@/lib/store-order";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -98,6 +101,127 @@ function DayField({
             ))}
           </ul>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+type Ingredient = { text: string; category: string; dishes: string[] };
+
+function ShoppingFromMenu({ dishes }: { dishes: string[] }) {
+  const { person } = usePerson();
+  const queryClient = useQueryClient();
+  const [suggestions, setSuggestions] = useState<Ingredient[] | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const suggest = useMutation({
+    mutationFn: async () => {
+      const shopping = await queryClient.fetchQuery({ queryKey: ["shopping"], queryFn: fetchShopping });
+      const res = await authFetch("/api/meal-ingredients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dishes,
+          existing: shopping.filter((s) => !s.done).map((s) => s.text),
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { items?: Ingredient[]; error?: string };
+      if (!res.ok) throw new Error(body.error ?? "Kunde inte ta fram ingredienser");
+      return body.items ?? [];
+    },
+    onSuccess: (items) => {
+      setSuggestions(items);
+      setSelected(new Set(items.map((_, i) => i)));
+      if (!items.length) toast.info("Allt som behövs verkar redan stå på listan");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Något gick fel"),
+  });
+
+  const add = useMutation({
+    mutationFn: () =>
+      addShoppingMany(
+        (suggestions ?? [])
+          .filter((_, i) => selected.has(i))
+          .map((item) => {
+            const category = normalizeCategory(item.category);
+            return { text: item.text, category, sort_order: categoryIndex(category) };
+          }),
+        person ?? "Hannes",
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shopping"] });
+      toast.success(`${selected.size} varor tillagda i handlarlistan`);
+      setSuggestions(null);
+    },
+    onError: () => toast.error("Kunde inte lägga till varorna"),
+  });
+
+  if (!dishes.length) return null;
+
+  if (!suggestions) {
+    return (
+      <Button
+        variant="secondary"
+        className="h-12 w-full rounded-xl"
+        disabled={suggest.isPending}
+        onClick={() => suggest.mutate()}
+      >
+        {suggest.isPending ? (
+          <Loader2 className="mr-2 size-4 animate-spin" />
+        ) : (
+          <Sparkles className="mr-2 size-4" />
+        )}
+        {suggest.isPending ? "Tar fram ingredienser…" : "Handla till veckans middagar"}
+      </Button>
+    );
+  }
+
+  const toggle = (index: number) => {
+    const next = new Set(selected);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    setSelected(next);
+  };
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-soft">
+      <div>
+        <p className="font-display text-base text-foreground">Förslag till handlarlistan</p>
+        <p className="text-xs text-muted-foreground">Bocka ur det ni redan har hemma.</p>
+      </div>
+      <ul className="space-y-1">
+        {suggestions.map((item, index) => (
+          <li key={`${item.text}-${index}`}>
+            <label className="flex items-start gap-3 rounded-xl px-1 py-2">
+              <input
+                type="checkbox"
+                checked={selected.has(index)}
+                onChange={() => toggle(index)}
+                className="mt-0.5 size-5 accent-primary"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm text-foreground">{item.text}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {CATEGORY_LABEL[normalizeCategory(item.category)]}
+                  {item.dishes.length ? ` · ${item.dishes.join(", ")}` : ""}
+                </span>
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <div className="flex gap-2">
+        <Button variant="ghost" className="h-11 rounded-xl" onClick={() => setSuggestions(null)}>
+          Avbryt
+        </Button>
+        <Button
+          className="h-11 flex-1 rounded-xl"
+          disabled={!selected.size || add.isPending}
+          onClick={() => add.mutate()}
+        >
+          <ShoppingBasket className="mr-2 size-4" />
+          Lägg till {selected.size} varor
+        </Button>
       </div>
     </div>
   );
@@ -204,6 +328,11 @@ export function MealPlanner() {
           />
         ))}
       </div>
+
+      <ShoppingFromMenu
+        key={currentWeek}
+        dishes={DAYS.map(dishFor).filter(Boolean)}
+      />
 
       <section className="space-y-2 pt-2">
         <h2 className="text-lg text-foreground">Arkiv</h2>

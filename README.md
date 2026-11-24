@@ -27,6 +27,8 @@ Importera ett nytt, tomt GitHub-repo i Vercel. Vercel känner igen Vite-konfigur
 | `VITE_SUPABASE_URL` | URL:en för Supabase-projektet |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabases publishable/anon-nyckel |
 | `VITE_VAPID_PUBLIC_KEY` | Valfri; behövs först när web push aktiveras |
+| `SUPABASE_SERVICE_ROLE_KEY` | Serverhemlighet för `api/`-funktionerna |
+| `GEMINI_API_KEY` | Serverhemlighet för dokumenttolkning och ingredienser från matsedeln |
 
 Byggkommandot är `npm run build` och katalogen för resultatet är `dist`.
 
@@ -34,7 +36,14 @@ Byggkommandot är `npm run build` och katalogen för resultatet är `dist`.
 
 Om samma Supabase-projekt används läser appen samma tabeller (`shopping_items`, `todo_items`, `meal_plan`, `meal_ideas`) och befintlig data blir kvar. Den här MVP:n ändrar inte databasen och kör inga migrationer.
 
-Originalprojektet använder öppna RLS-regler och en lokal personväljare, inte riktig inloggning. Det innebär att det inte är en tillräcklig säkerhetsmodell om projektets publika nyckel eller URL sprids. Innan appen delas utanför hushållet bör nästa steg vara Supabase Auth, hushållsmedlemskap och begränsade RLS-regler. Gör inte den förändringen utan en kontrollerad datamigrering.
+Inloggning sker med Supabase Auth (e-post och lösenord). Ett konto får bara tillgång till appen när det finns i tabellen `hemma_members`, som kopplar kontot till Hannes eller Elvira. Lägg till ett konto efter att personen har skapat det i appen:
+
+```sql
+insert into public.hemma_members (user_id, person)
+select id, 'Elvira' from auth.users where email = 'elviras@epost.se';
+```
+
+Migrationen `20261124120200_lock_down_rls.sql` stänger databasen och dokumentlagringen för alla som inte är medlemmar. Kör den först när båda kontona finns i `hemma_members`. Serverfunktionerna under `api/` kräver en inloggad medlem (utom `/api/notifications`, som skyddas av `CRON_SECRET`).
 
 ## Push-notiser
 

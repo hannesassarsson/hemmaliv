@@ -1,10 +1,14 @@
 import ICAL from "ical.js";
 
+import { requireMember } from "./_auth.js";
+
 const json = (response, status, body) => {
   response.status(status).json(body);
 };
 
 export default async function handler(request, response) {
+  if (!(await requireMember(request, response))) return;
+
   const icsUrl = process.env.FAMILY_CALENDAR_ICS_URL;
   if (!icsUrl) {
     return json(response, 500, { error: "Ingen kalenderlänk konfigurerad" });
@@ -70,6 +74,7 @@ export default async function handler(request, response) {
     return json(response, 502, { error: "Kunde inte tolka kalendern" });
   }
 
-  response.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=1800");
+  // Privat cache: svaret kräver inloggning och får inte lagras i Vercels CDN.
+  response.setHeader("Cache-Control", "private, max-age=300");
   return json(response, 200, { events });
 }

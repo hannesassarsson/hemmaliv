@@ -1,5 +1,7 @@
 import ICAL from "ical.js";
 
+import { authFetch } from "./person-context";
+
 export type CalendarEvent = {
   uid: string;
   title: string;
@@ -33,7 +35,7 @@ export async function fetchTraining(): Promise<CalendarEvent[]> {
 type FamilyApiEvent = { uid: string; title: string; start: string; end: string };
 
 export async function fetchFamilyEvents(): Promise<CalendarEvent[]> {
-  const res = await fetch("/api/family-calendar", { cache: "no-store" });
+  const res = await authFetch("/api/family-calendar", { cache: "no-store" });
   if (!res.ok) throw new Error("Kunde inte hämta familjekalendern");
   const data = (await res.json()) as { events: FamilyApiEvent[] };
   return data.events.map((e) => ({

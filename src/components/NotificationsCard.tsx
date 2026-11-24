@@ -4,26 +4,36 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { usePerson } from "@/lib/person-context";
-import { disablePush, enablePush, notificationPermission, pushSupported } from "@/lib/push";
+import { currentSubscription, disablePush, enablePush, notificationPermission } from "@/lib/push";
 
-export function NotificationsCard() {
+type State = "loading" | "unsupported" | "denied" | "off" | "on";
+
+async function readState(): Promise<State> {
+  const permission = notificationPermission();
+  if (permission === "unsupported") return "unsupported";
+  if (permission === "denied") return "denied";
+  if (permission === "default") return "off";
+  return (await currentSubscription()) ? "on" : "off";
+}
+
+/** `promptOnly` visar kortet bara när notiser inte är påslagna (används på översikten). */
+export function NotificationsCard({ promptOnly = false }: { promptOnly?: boolean }) {
   const { person } = usePerson();
-  const [state, setState] = useState<NotificationPermission | "unsupported" | "loading">(
-    "loading",
-  );
+  const [state, setState] = useState<State>("loading");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setState(notificationPermission());
+    void readState().then(setState);
   }, []);
 
   if (state === "loading") return null;
+  if (promptOnly && state !== "off") return null;
 
   if (state === "unsupported") {
     return (
       <p className="rounded-2xl border border-border bg-card p-4 text-xs text-muted-foreground shadow-soft">
-        Den här webbläsaren kan inte visa notiser. Lägg till appen på hemskärmen och öppna den
-        därifrån för att få påminnelser.
+        Den här webbläsaren kan inte visa notiser. På iPhone: tryck på Dela → Lägg till på
+        hemskärmen och öppna appen därifrån för att få påminnelser.
       </p>
     );
   }
@@ -32,12 +42,11 @@ export function NotificationsCard() {
     setBusy(true);
     try {
       await enablePush(person);
-      setState("granted");
       toast.success("Notiser påslagna");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Kunde inte slå på notiser");
-      setState(notificationPermission());
     } finally {
+      setState(await readState());
       setBusy(false);
     }
   };
@@ -48,6 +57,7 @@ export function NotificationsCard() {
       await disablePush();
       toast.success("Notiser avstängda på den här enheten");
     } finally {
+      setState(await readState());
       setBusy(false);
     }
   };
@@ -61,22 +71,17 @@ export function NotificationsCard() {
         <div className="min-w-0 flex-1">
           <p className="font-display text-base text-foreground">Påminnelser</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {state === "granted"
-              ? "Du får en notis när en deadline eller påminnelse infaller – även när appen är stängd."
+            {state === "on"
+              ? "Du får notiser för gemensamma uppgifter, din egen lista och handlingspåminnelser – även när appen är stängd."
               : state === "denied"
                 ? "Notiser är blockerade i webbläsarens inställningar för den här sidan. Tillåt dem där för att få påminnelser."
                 : "Slå på notiser för att bli påmind vid deadlines och varor med påminnelsedatum."}
           </p>
-          {state === "granted" ? (
-            <Button
-              variant="secondary"
-              className="mt-3 h-11 w-full rounded-xl"
-              disabled={busy}
-              onClick={disable}
-            >
+          {state === "on" ? (
+            <Button variant="secondary" className="mt-3 h-11 w-full rounded-xl" disabled={busy} onClick={disable}>
               <BellOff className="mr-2 size-4" /> Stäng av på denna enhet
             </Button>
-          ) : state === "default" ? (
+          ) : state === "off" ? (
             <Button className="mt-3 h-11 w-full rounded-xl" disabled={busy} onClick={enable}>
               <Bell className="mr-2 size-4" /> Slå på notiser
             </Button>

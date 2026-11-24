@@ -77,6 +77,20 @@ export async function enablePush(person: Person | null) {
   if (error) throw error;
 }
 
+export async function currentSubscription() {
+  if (!pushSupported()) return null;
+  const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+  return (await registration?.pushManager.getSubscription()) ?? null;
+}
+
+/** Håller prenumerationens person i synk med inloggat konto, så att personliga påminnelser hamnar rätt. */
+export async function refreshPushPerson(person: Person) {
+  if (notificationPermission() !== "granted") return;
+  const subscription = await currentSubscription();
+  if (!subscription) return;
+  await supabase.from("push_subscriptions").update({ person }).eq("endpoint", subscription.endpoint);
+}
+
 export async function disablePush() {
   if (!pushSupported()) return;
   const registration = await navigator.serviceWorker.getRegistration("/sw.js");
